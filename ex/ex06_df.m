@@ -45,7 +45,7 @@ colormap(color);
 axis equal;
 
 % compute path
-[mat_res step_count path, path_tot] = df(start, target, mat, h);
+[mat_res step_count path, path_tot] = df(start, target, mat, 'y', h);
 
 % add start and target position to the image and print out the step counter
 mat_res(start(1), start(2)) = 0.8;
