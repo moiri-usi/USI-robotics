@@ -5,4 +5,5 @@ lec
 *.pdf
 *.aux
 *.log
-
+*.png
+*.eps
