@@ -27,12 +27,18 @@
 <constant value="3" name="ST_RESET"/>
 <constant value="4" name="ST_END"/>
 <constant value="5" name="ST_RCV"/>
+<constant value="6" name="ST_WAIT_CMD"/>
+<constant value="7" name="ST_WAIT_END"/>
+<constant value="8" name="ST_RCV_ID"/>
+<constant value="9" name="ST_RCV_X"/>
+<constant value="10" name="ST_RCV_Y"/>
+<constant value="11" name="ST_RCV_TX"/>
+<constant value="12" name="ST_RCV_TY"/>
 <constant value="16" name="CMD_START"/>
 <constant value="17" name="CMD_STOP"/>
 <constant value="32" name="CMD_SEP"/>
 <constant value="33" name="CMD_NEG"/>
-<constant value="183" name="MY_ID"/>
-<constant value="6" name="ST_CHECK_ID"/>
+<constant value="9" name="MY_ID"/>
 
 
 <!--show keywords state-->
@@ -40,15 +46,16 @@
 
 
 <!--node thymio-II-->
-<node nodeId="1" name="thymio-II">var init_pose[3] = [0, 0, 0] # initial pose
-var t_x = 0 # x coord of path [cm]
-var t_y = 0 # y coord of path [cm]
+<node nodeId="1" name="thymio-II">
+var real_pose[3] = [0, 0, 0] # real pose entered by remote
+var targ_pose[3] = [0, 0, 0] # target pose entered by remote
+var int_pose[3] = [0, 0, 0] # calculated pose of robot
+var temp_pose[3] = [0, 0, 0] # temporary pose used for calcualtion
 var R = 5 # allowd deviation [cm]
-
-# internal variables
-var d_pose[3] = [0, 0, 0]
-var t_pose[3] = [0, 0, 0]
-var pose[3] = init_pose
+var drive_state = ST_RESET
+var next_drive_state = ST_RESET
+var cmd_state = ST_WAIT_CMD
+var next_cmd_state = ST_WAIT_CMD
 var R_init = R*100
 var R_step = DIST_100*INIT_SPEED/DELTA_SPEED
 var speed_out[2] = [0, 0]
@@ -58,12 +65,8 @@ var turn_dist = 0
 var drive_dist[2] = [0, 0]
 var g_drive_dist[2] = [0, 0]
 var reached[2] = [0, 0]
-var state = ST_RESET
-var new_state = ST_RESET
-var old_state = ST_RESET
 var n = 0
 var dec_cnt = 0
-var sep_cnt = 0
 var rc5_val = 0
 var rc5_neg = 0
 
@@ -74,63 +77,60 @@ R = R*100
 # turn_speed = (+100, -100) -> turns 783 per 100ms
 
 onevent timer0
-	# save actual mean speed and reset mean calculation
-	d_pose[0] = speed_out[0]
-	d_pose[1] = speed_out[1]
-	speed_out = [0, 0]
-	n = 0
-	
-	if state == ST_RESET then
+	if drive_state == ST_RESET then
 		motor.left.target = 0
 		motor.right.target = 0
-		d_pose = [0, 0, 0]
-		t_pose = [0, 0, 0]
+		temp_pose = [0, 0, 0]
+		targ_pose = [0, 0, 0]
+		real_pose = [0, 0, 0]
+		int_pose = [0, 0, 0]
 		speed_out = [0, 0]
-		pose = init_pose
 		delta_dist = 0
 		turn_dist = 0
 		drive_dist = [0, 0]
 		g_drive_dist = [0, 0]
 		n = 0
 		call leds.top(0, 0, 0)
-		new_state = ST_RESET
+		next_drive_state = ST_RESET
+	end
+	if drive_state == ST_RCV then
+		motor.left.target = 0
+		motor.right.target = 0
+		next_drive_state = ST_RCV
 	else
+		# save actual mean speed and reset mean calculation
+		temp_pose[0] = speed_out[0]
+		temp_pose[1] = speed_out[1]
+		speed_out = [0, 0]
+		n = 0
 		# set new angle
 		if motor.left.target > 0 or motor.right.target > 0 then
-			call math.muldiv(d_pose[2], d_pose[1] - d_pose[0], TURN_100, 2*TURN_SPEED)
-			pose[2] += d_pose[2]
+			call math.muldiv(temp_pose[2], temp_pose[1] - temp_pose[0], TURN_100, 2*TURN_SPEED)
+			int_pose[2] += temp_pose[2]
 		end
 		# set new x and y cooridinates
-		delta_dist = (d_pose[0] + d_pose[1])*DIST_100/(2*DELTA_SPEED)
-		call math.cos(d_pose[0], pose[2])
-		call math.sin(d_pose[1], pose[2])
-		call math.muldiv(d_pose[0], delta_dist, d_pose[0], 32767)
-		call math.muldiv(d_pose[1], delta_dist, d_pose[1], 32767)
-		pose[0] += d_pose[0]
-		pose[1] += d_pose[1]
+		delta_dist = (temp_pose[0] + temp_pose[1])*DIST_100/(2*DELTA_SPEED)
+		call math.cos(temp_pose[0], int_pose[2])
+		call math.sin(temp_pose[1], int_pose[2])
+		call math.muldiv(temp_pose[0], delta_dist, temp_pose[0], 32767)
+		call math.muldiv(temp_pose[1], delta_dist, temp_pose[1], 32767)
+		int_pose[0] += temp_pose[0]
+		int_pose[1] += temp_pose[1]
 	end
 
 	# check if target pose has been reached
-	if state == ST_RCV then
-		motor.left.target = 0
-		motor.right.target = 0
-		new_state = ST_RCV
-	end
-	if state == ST_SET_TARGET then
-		call math.atan2(t_pose[2], t_y - pose[1], t_x - pose[0])
-		t_pose[0] = t_x
-		t_pose[1] = t_y
+	if drive_state == ST_SET_TARGET then
 		reached = [0, 0]
-		new_state = ST_TURN
+		next_drive_state = ST_TURN
 	end
-	if state == ST_TURN then
-		turn_dist = (t_pose[2]/10 - pose[2]/10) * 10
+	if drive_state == ST_TURN then
+		turn_dist = (targ_pose[2]/10 - int_pose[2]/10) * 10
 		if turn_dist &lt;= TURN_100 and turn_dist >= -TURN_100 then
-			new_state = ST_DRIVE
+			next_drive_state = ST_DRIVE
 			motor.left.target = 0
 			motor.right.target = 0
 		else
-			new_state = ST_TURN
+			next_drive_state = ST_TURN
 			if turn_dist &lt; 0 then
 				motor.left.target = TURN_SPEED
 				motor.right.target = -TURN_SPEED
@@ -140,9 +140,9 @@ onevent timer0
 			end
 		end
 	end
-	if state == ST_DRIVE then
-		drive_dist[0] = t_pose[0] - pose[0]
-		drive_dist[1] = t_pose[1] - pose[1]
+	if drive_state == ST_DRIVE then
+		drive_dist[0] = targ_pose[0] - int_pose[0]
+		drive_dist[1] = targ_pose[1] - int_pose[1]
 		# check if target is reached for both axes
 		if drive_dist[0] &lt;= R_step and drive_dist[0] >= -R_step then
 			reached[0] = 1 # reached x target
@@ -152,7 +152,7 @@ onevent timer0
 		end
 		if reached[0] == 1 and reached[1] == 1 then
 			# reached destination
-			new_state = ST_END
+			next_drive_state = ST_END
 			motor.left.target = 0
 			motor.right.target = 0
 			g_drive_dist += drive_dist
@@ -164,12 +164,12 @@ onevent timer0
 				call leds.top(0, 0, 0)
 			end
 		else
-			new_state = ST_DRIVE
+			next_drive_state = ST_DRIVE
 			motor.left.target = speed_in
 			motor.right.target = speed_in
 		end
 	end
-	if state == ST_END then
+	if drive_state == ST_END then
 		# check if robot is still within the permitted boundaries
 		if g_drive_dist[0] > R or g_drive_dist[0] &lt; -R or
 			g_drive_dist[1] > R or g_drive_dist[1] &lt; -R then
@@ -177,9 +177,9 @@ onevent timer0
 		else	
 			call leds.top(0, 32, 0)
 		end
-		new_state = ST_END
+		next_drive_state = ST_END
 	end
-	state = new_state		
+	drive_state = next_drive_state
 	
 	# log
 #	emit log_rc5_cmd rc5.command
@@ -187,8 +187,8 @@ onevent timer0
 #	emit log_rc5_val rc5_val
 #	emit state_log state
 #	emit new_state_log new_state
-	emit pose_log pose
-	emit t_pose_log t_pose
+	emit pose_log int_pose
+	emit t_pose_log targ_pose
 
 onevent motor
 	# mean speed calculation
@@ -198,17 +198,26 @@ onevent motor
 
 onevent rc5
 	when rc5.command == CMD_START do
-		if state == ST_RESET or state == ST_END then
-			state = ST_RCV
-		end
-		sep_cnt = 0
+		#if cmd_state == ST_WAIT_CMD then
 		rc5_val = 0
-		call leds.top(16, 0, 16)
-		old_state = state
+		call leds.top(16, 16, 0)
+		next_cmd_state = ST_RCV_ID
+		if drive_state == ST_RESET or drive_state == ST_END then
+			next_drive_state = ST_RCV
+			drive_state = ST_RCV
+		end
+		#end
 	end
 	when rc5.command == CMD_STOP do
-		if state == ST_RCV then
-			state = ST_SET_TARGET
+		if cmd_state == ST_RCV_TY then
+			
+		end
+		if cmd_state == ST_WAIT_END then
+			targ_pose[1] = rc5_val*100
+			call math.atan2(targ_pose[2], targ_pose[1] - real_pose[1], targ_pose[0] - real_pose[0])
+			next_drive_state = ST_SET_TARGET
+			drive_state = ST_SET_TARGET
+			next_cmd_state = ST_WAIT_CMD
 			call leds.top(0, 0, 0)
 		end
 	end
@@ -217,48 +226,39 @@ onevent rc5
 			rc5_val = -rc5_val
 			rc5_neg = 0
 		end
-		if sep_cnt == 0 then
-			# id
-			dec_cnt = 0
+		if cmd_state == ST_RCV_ID then
 			rc5_neg = 0
 			if rc5_val == MY_ID then
-				state = ST_RCV
-#				pose[0] = 0
-#				pose[1] = 0
-				call leds.top(0, 0, 32)
-				sep_cnt++
+				next_cmd_state = ST_RCV_X
+				next_drive_state = ST_RCV
+				drive_state = ST_RCV
+				call leds.top(0, 32, 0)
 			else
+				next_cmd_state = ST_WAIT_CMD
 				call leds.top(0, 0, 0)
-				state = old_state
 			end
-		else if sep_cnt == 1 then
-			# x
-			call leds.top(8, 8, 32)
-			t_pose[0] = rc5_val*100
-			sep_cnt++
-		else if sep_cnt == 2 then
-			# y
-			call leds.top(16, 16, 32)
-			t_pose[1] = rc5_val*100
-			call math.atan2(pose[2], t_pose[1]-pose[1], t_pose[0]-pose[0])
-			pose[0] = t_pose[0]
-			pose[1] = t_pose[1]
-			sep_cnt++
-		else if sep_cnt == 3 then
-			# x_p
-			call leds.top(24, 24, 32)
-			t_x = rc5_val*100
-			sep_cnt++
-		else if sep_cnt == 4 then
-			# y_p
+		end
+		if cmd_state == ST_RCV_X then
+			next_cmd_state = ST_RCV_Y
+			call leds.top(0, 0, 32)
+			temp_pose[0] = rc5_val*100
+		end
+		if cmd_state == ST_RCV_Y then
+			next_cmd_state = ST_RCV_TX
+			call leds.top(0, 0, 32)
+			temp_pose[1] = rc5_val*100
+			call math.atan2(temp_pose[2], temp_pose[1]-real_pose[1], temp_pose[0]-real_pose[0])
+			real_pose = temp_pose
+			int_pose = real_pose
+		end
+		if cmd_state == ST_RCV_TX then
+			next_cmd_state = ST_WAIT_END
 			call leds.top(32, 32, 32)
-			t_y = rc5_val*100
-			sep_cnt++
-		else
-			# ignore anything from here
-		end end end end end
+			targ_pose[0] = rc5_val*100
+		end
 		dec_cnt = 0
 	end
+	cmd_state = next_cmd_state
 	when rc5.command == CMD_NEG do
 		rc5_neg = 1
 	end
@@ -275,18 +275,18 @@ onevent rc5
 # DEBUG
 onevent button.center
 	when button.center == 1 do
-		if state == ST_RESET then
-			state = ST_SET_TARGET
+		if drive_state == ST_RESET then
+			drive_state = ST_SET_TARGET
 		else
 			speed_in = INIT_SPEED
 			R = R_init
-			state = ST_RESET
+			drive_state = ST_RESET
 		end
 	end
 
 onevent button.forward
 	when button.forward == 1 do
-		if state == ST_RESET then
+		if drive_state == ST_RESET then
 			speed_in += DELTA_SPEED
 			if speed_in > MAX_SPEED then
 				speed_in = MAX_SPEED
@@ -297,7 +297,7 @@ onevent button.forward
 
 onevent button.backward
 	when button.backward == 1 do
-		if state == ST_RESET then
+		if drive_state == ST_RESET then
 			speed_in -= DELTA_SPEED
 			if speed_in &lt; MIN_SPEED then
 				speed_in = MIN_SPEED
@@ -308,7 +308,7 @@ onevent button.backward
 
 onevent button.left
 	when button.left == 1 do
-		if state == ST_RESET then
+		if drive_state == ST_RESET then
 			R -= 100
 			if R &lt;= 0 then
 				R = 100
@@ -318,7 +318,7 @@ onevent button.left
 
 onevent button.right
 	when button.right == 1 do
-		if state == ST_RESET then
+		if drive_state == ST_RESET then
 			R += 100
 		end
 	end</node>
