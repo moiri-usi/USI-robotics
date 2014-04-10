@@ -90,7 +90,9 @@ Figure \ref{fig:path} shows a path computed with my algorithm. Backtracking and
 a short path heuristic is used. In general, the heuristic does not lead to the
 shortest path possible. The heuristic uses the x and y components of the
 distance vector (target - actual position) and tries to reduce first the y
-component and then the x component.
+component and then the x component. Other heuristics are avaliable (check
+the function header comments in the file \emph{df.m}) but for the provided maze,
+the heuristic mentioned above (parameter 'y') proved to be the best (95 steps).
 
 \begin{figure}[h]
     \includegraphics[width=1\columnwidth]{ex06_graph}
