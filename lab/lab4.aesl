@@ -1,0 +1,134 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event size="2" name="prox_amb_log"/>
+<event size="2" name="prox_ref_log"/>
+<event size="2" name="prox_delta_log"/>
+<event size="7" name="prox_log"/>
+
+
+<!--list of constants-->
+<constant value="100" name="FORWARD_SPEED"/>
+<constant value="0" name="FOLLOW_LINE"/>
+<constant value="1" name="AVOID_OBSTACLE"/>
+<constant value="2" name="FOLLOW_OBSTACLE"/>
+<constant value="500" name="TH_SENS"/>
+<constant value="1" name="TH_SEARCH"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II"># white: reflection 946 957
+# half black: reflection 374 507
+# balck: reflection 257 209
+var forward_speed = FORWARD_SPEED
+var left_speed = 0
+var right_speed = 0
+var state = FOLLOW_LINE
+var front_prox[5]
+var front_prox_stat[3]
+var track = 0
+var crossed_track = 0
+var th_search = TH_SEARCH
+
+onevent prox
+	front_prox = [prox.horizontal[0], prox.horizontal[1], prox.horizontal[2], prox.horizontal[3], prox.horizontal[4]]
+	call math.stat(front_prox, front_prox_stat[0], front_prox_stat[1], front_prox_stat[2])
+	if state == FOLLOW_LINE then
+		#follow the track
+		forward_speed = FORWARD_SPEED
+		left_speed = (prox.ground.reflected[0]-250)/10
+		right_speed = (prox.ground.reflected[1]-200)/10
+		
+		if prox.ground.reflected[0] >= TH_SENS and prox.ground.reflected[1] &lt; TH_SENS then
+			#track on the right
+			track--
+		end
+		if prox.ground.reflected[0] &lt; TH_SENS and prox.ground.reflected[1] >= TH_SENS then
+			#track on the right
+			track++			
+		end
+		if prox.ground.reflected[0] &lt; TH_SENS and prox.ground.reflected[1] &lt; TH_SENS then
+			#on the track
+			track = 0
+			crossed_track = 1		
+		end
+		
+		if prox.ground.reflected[0] >= TH_SENS and prox.ground.reflected[1] >= TH_SENS then
+			if track > th_search then
+				right_speed = FORWARD_SPEED
+				left_speed = 0
+				crossed_track = 0
+			end
+			if track &lt; -th_search then
+				right_speed = 0
+				left_speed = FORWARD_SPEED
+				crossed_track = 0
+			end
+			if crossed_track == 1 then
+				left_speed = FORWARD_SPEED
+				right_speed = -FORWARD_SPEED
+			end
+		end
+		
+		if front_prox_stat[1] > 0 then
+			state = AVOID_OBSTACLE
+		end	
+	end
+	if state == AVOID_OBSTACLE then
+		# slow down when obstacle is ahead
+		forward_speed = 0
+		# escape obstacle
+		left_speed = FORWARD_SPEED
+		right_speed = 0
+		track = 0
+		if front_prox_stat[1] == 0 then
+			state = FOLLOW_OBSTACLE
+		end
+	end
+	if state == FOLLOW_OBSTACLE then
+		forward_speed = FORWARD_SPEED
+		left_speed = 0
+		right_speed = 70
+		if prox.ground.reflected[0] &lt; TH_SENS then
+			state = FOLLOW_LINE
+		end
+		if front_prox_stat[1] > 0 then
+			state = AVOID_OBSTACLE
+		end	
+	end
+	
+	# set wheel speed
+	motor.left.target = forward_speed + left_speed
+	motor.right.target = forward_speed + right_speed
+	
+onevent button.center
+	when button.center == 1 do
+		track = 0
+		crossed_track = 0
+		th_search = TH_SEARCH
+		forward_speed = FORWARD_SPEED
+		state = FOLLOW_LINE
+	end
+	
+onevent button.forward
+	when button.forward == 1 do
+		th_search++
+	end
+	
+onevent button.backward
+	when button.backward == 1 do
+		th_search--
+		if th_search &lt; 0 then
+			th_search = 0
+		end
+	end
+</node>
+
+
+</network>

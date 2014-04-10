@@ -1,0 +1,241 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event size="3" name="pose_log"/>
+<event size="3" name="t_pose_log"/>
+
+
+<!--list of constants-->
+<constant value="200" name="INIT_SPEED"/>
+<constant value="100" name="MIN_SPEED"/>
+<constant value="400" name="MAX_SPEED"/>
+<constant value="100" name="DELTA_SPEED"/>
+<constant value="100" name="TURN_SPEED"/>
+<constant value="783" name="TURN_100"/>
+<constant value="35" name="DIST_100"/>
+<constant value="5" name="RUN_CNT"/>
+<constant value="0" name="ST_TURN"/>
+<constant value="1" name="ST_DRIVE"/>
+<constant value="2" name="ST_SET_TARGET"/>
+<constant value="3" name="ST_RESET"/>
+<constant value="4" name="ST_END"/>
+<constant value="5" name="ST_RCV"/>
+<constant value="16" name="CMD_START"/>
+<constant value="17" name="CMD_STOP"/>
+<constant value="32" name="CMD_SEP"/>
+<constant value="33" name="CMD_NEG"/>
+<constant value="183" name="MY_ID"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">var init_pose[3] = [0, 0, 8192] # initial pose
+var t_x[RUN_CNT] = [0, 30, 30, -30, 0] # x coord of path [cm]
+var t_y[RUN_CNT] = [30, 30, -30, -30, 0] # y coord of path [cm]
+var R = 5 # allowd deviation [cm]
+
+# internal variables
+var d_pose[3] = [0, 0, 0]
+var t_pose[3] = [0, 0, 0]
+var pose[3] = init_pose
+var R_init = R*100
+var R_step = DIST_100*INIT_SPEED/DELTA_SPEED
+var speed_out[2] = [0, 0]
+var speed_in = INIT_SPEED
+var delta_dist = 0 # 1/10 of mm
+var turn_dist = 0
+var drive_dist[2] = [0, 0]
+var g_drive_dist[2] = [0, 0]
+var reached[2] = [0, 0]
+var state = ST_RESET
+var new_state = ST_RESET
+var n = 0
+var run_cnt = 0
+
+timer.period[0] = 100
+R = R*100
+
+# speed = 200 -> travels 3.5mm per 100ms
+# turn_speed = (+100, -100) -> turns 783 per 100ms
+
+onevent timer0
+	# save actual mean speed and reset mean calculation
+	d_pose[0] = speed_out[0]
+	d_pose[1] = speed_out[1]
+	speed_out = [0, 0]
+	n = 0
+	
+	if state == ST_RESET then
+		motor.left.target = 0
+		motor.right.target = 0
+		d_pose = [0, 0, 0]
+		t_pose = [0, 0, 0]
+		speed_out = [0, 0]
+		pose = init_pose
+		run_cnt = 0
+		delta_dist = 0
+		turn_dist = 0
+		drive_dist = [0, 0]
+		g_drive_dist = [0, 0]
+		n = 0
+		call leds.top(0, 0, 0)
+		new_state = ST_RESET
+	else
+		# set new angle
+		if motor.left.target > 0 or motor.right.target > 0 then
+			call math.muldiv(d_pose[2], d_pose[1] - d_pose[0], TURN_100, 2*TURN_SPEED)
+			pose[2] += d_pose[2]
+		end
+		# set new x and y cooridinates
+		delta_dist = (d_pose[0] + d_pose[1])*DIST_100/(2*DELTA_SPEED)
+		call math.cos(d_pose[0], pose[2])
+		call math.sin(d_pose[1], pose[2])
+		call math.muldiv(d_pose[0], delta_dist, d_pose[0], 32767)
+		call math.muldiv(d_pose[1], delta_dist, d_pose[1], 32767)
+		pose[0] += d_pose[0]
+		pose[1] += d_pose[1]
+	end
+
+	# check if target pose has been reached
+	if state == ST_RCV then
+		motor.left.target = 0
+		motor.right.target = 0
+	end
+	if state == ST_SET_TARGET then
+		if run_cnt >= RUN_CNT then
+			new_state = ST_END
+		else
+			call math.atan2(t_pose[2], t_y[run_cnt]*100 - t_pose[1], t_x[run_cnt]*100 - t_pose[0])
+			t_pose[0] = t_x[run_cnt]*100 - g_drive_dist[0]
+			t_pose[1] = t_y[run_cnt]*100 - g_drive_dist[1]
+			reached = [0, 0]
+			new_state = ST_TURN
+			run_cnt++
+			#call leds.top(0, 0, 0)
+		end
+	end
+	if state == ST_TURN then
+		turn_dist = (t_pose[2]/10 - pose[2]/10) * 10
+		if turn_dist &lt;= TURN_100 and turn_dist >= -TURN_100 then
+			new_state = ST_DRIVE
+			#new_state = SET_TARGET
+			motor.left.target = 0
+			motor.right.target = 0
+		else
+			new_state = ST_TURN
+			if turn_dist &lt; 0 then
+				motor.left.target = TURN_SPEED
+				motor.right.target = -TURN_SPEED
+			else
+				motor.left.target = -TURN_SPEED
+				motor.right.target = TURN_SPEED
+			end
+		end
+	end
+	if state == ST_DRIVE then
+		drive_dist[0] = t_pose[0] - pose[0]
+		drive_dist[1] = t_pose[1] - pose[1]
+		# check if target is reached for both axes
+		if drive_dist[0] &lt;= R_step and drive_dist[0] >= -R_step then
+			reached[0] = 1 # reached x target
+		end
+		if drive_dist[1] &lt;= R_step and drive_dist[1] >= -R_step then
+			reached[1] = 1 # reached y target
+		end
+		if reached[0] == 1 and reached[1] == 1 then
+			# reached destination
+			new_state = ST_SET_TARGET
+			motor.left.target = 0
+			motor.right.target = 0
+			g_drive_dist += drive_dist
+			# check if robot is still within the permitted boundaries
+			if g_drive_dist[0] > R or g_drive_dist[0] &lt; -R or
+				g_drive_dist[1] > R or g_drive_dist[1] &lt; -R then
+				call leds.top(16, 16, 0)
+			else	
+				call leds.top(0, 0, 0)
+			end
+		else
+			new_state = ST_DRIVE
+			motor.left.target = speed_in
+			motor.right.target = speed_in
+		end
+	end
+	if state == ST_END then
+		# check if robot is still within the permitted boundaries
+		if g_drive_dist[0] > R or g_drive_dist[0] &lt; -R or
+			g_drive_dist[1] > R or g_drive_dist[1] &lt; -R then
+			call leds.top(32, 0, 0)
+		else	
+			call leds.top(0, 32, 0)
+		end
+	end
+	state = new_state
+	
+	emit pose_log pose
+	emit t_pose_log t_pose
+
+onevent motor
+	# mean speed calculation
+	speed_out[0] += (motor.left.speed - speed_out[0])/(n+1)
+	speed_out[1] += (motor.right.speed - speed_out[1])/(n+1)
+	n++
+	
+# DEBUG
+onevent button.center
+	when button.center == 1 do
+		if state == ST_RESET then
+			state = ST_SET_TARGET
+		else
+			speed_in = INIT_SPEED
+			R = R_init
+			state = ST_RESET
+		end
+	end
+
+onevent button.forward
+	when button.forward == 1 do
+		if state == ST_RESET then
+			speed_in += DELTA_SPEED
+			if speed_in > MAX_SPEED then
+				speed_in = MAX_SPEED
+			end
+			R_step = DIST_100*speed_in/DELTA_SPEED
+		end
+	end
+
+onevent button.backward
+	when button.backward == 1 do
+		if state == ST_RESET then
+			speed_in -= DELTA_SPEED
+			if speed_in &lt; MIN_SPEED then
+				speed_in = MIN_SPEED
+			end
+			R_step = DIST_100*speed_in/DELTA_SPEED
+		end
+	end
+
+onevent button.left
+	when button.left == 1 do
+		if state == ST_RESET then
+			R -= 100
+			if R &lt;= 0 then
+				R = 100
+			end
+		end
+	end
+
+onevent button.right
+	when button.right == 1 do
+		if state == ST_RESET then
+			R += 100
+		end
+	end</node>
+
+
+</network>

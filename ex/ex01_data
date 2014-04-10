@@ -1,0 +1,36 @@
+# Created by Octave 3.6.4, Mon Feb 24 15:53:05 2014 CET <moiri@hesinde>
+# name: data
+# type: scalar struct
+# ndims: 2
+ 1 1
+# length: 4
+# name: y
+# type: matrix
+# rows: 1
+# columns: 11
+ -79 -68 -54 -36 -19 0 18 34 55 76 78
+
+
+# name: r
+# type: matrix
+# rows: 1
+# columns: 11
+ -40 3 4 3 2 0 0 0 0 -2 42
+
+
+# name: er
+# type: matrix
+# rows: 1
+# columns: 11
+ 4 1.5 1 0.5 0 0 0 0 1 1.5 3
+
+
+# name: ey
+# type: matrix
+# rows: 1
+# columns: 11
+ 4 4 4.5 2.5 2 0 1 1.5 2 4.5 4.5
+
+
+
+

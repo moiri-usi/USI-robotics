@@ -1,0 +1,23 @@
+ang1 = [0:0.01:0.5];
+ang2 = fliplr([0.5:0.01:1]);
+ang3 = ones(1, length(ang1)) * 3/2;
+val11 = shiftdim(-sin(ang1*pi), -1);
+val12 = shiftdim(cos(ang1*pi), -1);
+val13 = shiftdim(ones(1, length(ang1)), -1);
+val21 = shiftdim(-sin(ang2*pi), -1);
+val22 = shiftdim(cos(ang2*pi), -1);
+val23 = shiftdim(ones(1, length(ang2)), -1);
+val31 = shiftdim(-sin(ang3*pi), -1);
+val32 = shiftdim(cos(ang3*pi), -1);
+val33 = shiftdim(ones(1, length(ang3)), -1);
+M = [val11 val12 val13; val21 val22 val23; val31 val32 val33];
+v = [1; -1; 0];
+res = zeros(3, 1, length(ang1));
+for k = [1:length(ang1)],
+    res(:, :, k) = pinv(M(:, :, k))*v;
+end;
+x = fliplr([0:0.01:0.5]);
+plot(x, shiftdim(res(2, :, :), 1));
+title("Forward Speed of the Robot");
+xlabel("absolute value of the angle between y-axis and motor-axis of the front wheels [fraction of pi]");
+ylabel("forward speed of the robot [m/s]");

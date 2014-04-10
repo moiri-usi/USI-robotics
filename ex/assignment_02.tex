@@ -1,0 +1,337 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Short Sectioned Assignment
+% LaTeX Template
+% Version 1.0 (5/5/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Frits Wenneker (http://www.howtotex.com)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[paper=a4, fontsize=11pt]{scrartcl} % A4 paper and 11pt font size
+
+\usepackage[utf8]{inputenc}
+%\usepackage[T1]{fontenc} % Use 8-bit encoding that has 256 glyphs
+\usepackage{fourier} % Use the Adobe Utopia font for the document - comment this line to return to the LaTeX default
+\usepackage[english]{babel} % English language/hyphenation
+\usepackage{amsmath,amsfonts,amsthm} % Math packages
+
+\usepackage{nameref}
+\usepackage{graphicx} % Required to insert images
+%\usepackage{lipsum} % Used for inserting dummy 'Lorem ipsum' text into the template
+
+\usepackage{sectsty} % Allows customizing section commands
+\allsectionsfont{\centering \normalfont\scshape} % Make all sections centered, the default font and small caps
+
+\usepackage{fancyhdr} % Custom headers and footers
+\pagestyle{fancyplain} % Makes all pages in the document conform to the custom headers and footers
+\fancyhead{} % No page header - if you want one, create it in the same way as the footers below
+\fancyfoot[L]{} % Empty left footer
+\fancyfoot[C]{} % Empty center footer
+\fancyfoot[R]{\thepage} % Page numbering for right footer
+\renewcommand{\headrulewidth}{0pt} % Remove header underlines
+\renewcommand{\footrulewidth}{0pt} % Remove footer underlines
+\setlength{\headheight}{13.6pt} % Customize the height of the header
+
+%\numberwithin{equation}{section} % Number equations within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+%\numberwithin{figure}{section} % Number figures within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+%\numberwithin{table}{section} % Number tables within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs - comment this line for an assignment with lots of text
+
+%----------------------------------------------------------------------------------------
+%	TITLE SECTION
+%----------------------------------------------------------------------------------------
+
+\newcommand{\horrule}[1]{\rule{\linewidth}{#1}} % Create horizontal rule command with 1 argument of height
+
+\title{	
+\normalfont \normalsize 
+\textsc{Università della Svizzera Italiana, Faculty of Informatics} \\ [25pt] % Your university, school and/or department name(s)
+\horrule{0.5pt} \\[0.4cm] % Thin top horizontal rule
+\huge Mobile Robot Kinematics \\ % The assignment title
+\horrule{2pt} \\[0.5cm] % Thick bottom horizontal rule
+}
+
+\author{Simon Maurer} % Your name
+
+\date{\normalsize\today} % Today's date or a custom date
+
+\begin{document}
+
+\maketitle % Print the title
+
+%----------------------------------------------------------------------------------------
+%	PROBLEM 1
+%----------------------------------------------------------------------------------------
+
+\section{Assignment 2.1}
+
+Differential drive robot:
+\begin{itemize}
+    \item Distance between wheels $ d_r = 2r = 60 mm $
+    \item Wheel diameter $ d_w = 40 mm $
+    \item 1000 steps per revolution of the wheel
+\end{itemize}
+
+%------------------------------------------------
+
+\subsection{First 10 seconds}
+\begin{itemize}
+    \item left wheel is rotating with 375 steps per second
+    \item right wheel is rotating with 150 steps per second
+    \item starting at the pose $ (x, y, \theta) = (0, 0, 0) $
+\end{itemize}
+
+Calculation of the wheel speeds:
+\begin{equation}
+    v_l = 2\pi * \frac{375}{375} * \frac{d_w}{2} = 40\pi \frac{mm}{s}
+\end{equation}
+\begin{equation}
+    v_r = 2\pi * \frac{150}{375} * \frac{d_w}{2} = 16\pi \frac{mm}{s}
+\end{equation}
+Calculation of $ \omega $, $ R $ and $ ICC $:
+\begin{equation}
+    \omega = \frac{v_r - v_l}{2r} = -0.4\pi \frac{rad}{s}
+\end{equation}
+\begin{equation}
+    R = \frac{r(v_r + v_l)}{v_r - v_l} = -70 mm
+\end{equation}
+\begin{equation}
+    ICC = \begin{bmatrix}
+        x - R\sin(\theta)\\
+        y + R\cos(\theta)
+    \end{bmatrix} = \begin{bmatrix}
+        0\\
+        R
+    \end{bmatrix} = \begin{bmatrix}
+        0\\
+        -70 mm
+    \end{bmatrix}
+\end{equation}
+Calculation of the new pose (with $ \delta t = 10 s) $:
+\begin{equation}
+    \begin{bmatrix}
+        x'\\
+        y'\\
+        \theta'
+    \end{bmatrix}
+    = \begin{bmatrix}
+        \cos(\omega \delta t) & -\sin(\omega \delta t) & 0\\
+        \sin(\omega \delta t) & \cos(\omega \delta t) & 0\\
+        0 & 0 & 1
+    \end{bmatrix}
+    \begin{bmatrix}
+        x - ICC_x\\
+        y - ICC_y\\
+        \theta
+    \end{bmatrix}
+    + \begin{bmatrix}
+        ICC_x\\
+        ICC_y\\
+        \omega \delta t
+    \end{bmatrix}
+    = \begin{bmatrix}
+        0\\
+        0\\
+        0
+    \end{bmatrix}
+\end{equation}
+The robot turns two times clockwise around the point $ (0, -70 mm) $ and ends
+after 10 seconds at the origin.
+
+%------------------------------------------------
+
+\subsection{Following 20 seconds}
+
+\begin{itemize}
+    \item left wheel is rotating with 600 steps per second
+    \item right wheel is rotating with 300 steps per second
+    \item starting at the pose $ (x, y, \theta) = (0, 0, 0) $ (as calcualated
+        before)
+\end{itemize}
+
+Calculation of the wheel speeds:
+\begin{equation}
+    v_l = 2\pi * \frac{600}{375} * \frac{d_w}{2} = 64\pi \frac{mm}{s}
+\end{equation}
+\begin{equation}
+    v_r = 2\pi * \frac{300}{375} * \frac{d_w}{2} = 32\pi \frac{mm}{s}
+\end{equation}
+Calculation of $ \omega $, $ R $ and $ ICC $:
+\begin{equation}
+    \omega = \frac{v_r - v_l}{2r} = -\frac{8}{15}\pi \frac{rad}{s}
+\end{equation}
+\begin{equation}
+    R = \frac{r(v_r + v_l)}{v_r - v_l} = -60 mm
+\end{equation}
+\begin{equation}
+    ICC = \begin{bmatrix}
+        x - R\sin(\theta)\\
+        y + R\cos(\theta)
+    \end{bmatrix} = \begin{bmatrix}
+        0\\
+        R
+    \end{bmatrix} = \begin{bmatrix}
+        0\\
+        -60 mm
+    \end{bmatrix}
+\end{equation}
+Calculation of the new pose (with $ \delta t = 20 s) $:
+\begin{equation}
+    \begin{bmatrix}
+        x'\\
+        y'\\
+        \theta'
+    \end{bmatrix}
+    = \begin{bmatrix}
+        \cos(\omega \delta t) & -\sin(\omega \delta t) & 0\\
+        \sin(\omega \delta t) & \cos(\omega \delta t) & 0\\
+        0 & 0 & 1
+    \end{bmatrix}
+    \begin{bmatrix}
+        x - ICC_x\\
+        y - ICC_y\\
+        \theta
+    \end{bmatrix}
+    + \begin{bmatrix}
+        ICC_x\\
+        ICC_y\\
+        \omega \delta t
+    \end{bmatrix}
+    = \begin{bmatrix}
+        30\sqrt 3 mm\\
+        -90 mm\\
+        -\frac{2}{3} \pi
+    \end{bmatrix}
+\end{equation}
+The robot passes fife times the origin while turning clockwise around the point
+$ (0, -60 mm) $ and then stops at the pose $ (52 mm, -90 mm, -\frac{2}{3} \pi)
+$.
+%------------------------------------------------
+
+%----------------------------------------------------------------------------------------
+%	PROBLEM 2
+%----------------------------------------------------------------------------------------
+
+\section{Assignment 2.2}
+
+Holonomic drive robot
+\begin{itemize}
+\item Infinite torque
+\item Maximum speed of $ \pm 1 \frac{m}{s} $
+\end{itemize}
+
+When driving forward with maximal speed ($ v_x = 0, v_y = v_{max}, \omega
+= 0 $), the speed of the rear wheel is zero and the speed of the two front
+wheels (arranged in an angle of 120 degrees) is maximal.
+\begin{equation}
+    \label{inv_kin}
+    \begin{bmatrix}
+        v_x\\
+        v_y\\
+        r \omega
+    \end{bmatrix}
+    = \begin{bmatrix}
+        -\sin(\varphi_1) & \cos(\varphi_1) & 1\\
+        -\sin(\varphi_2) & \cos(\varphi_2) & 1\\
+        -\sin(\varphi_3) & \cos(\varphi_3) & 1\\
+    \end{bmatrix}^+
+    \begin{bmatrix}
+        v_1\\
+        v_2\\
+        v_3
+    \end{bmatrix}
+\end{equation}
+where matrix $ A^+ $ is the pseudoinverse of matrix $ A $ and
+\begin{equation}
+    \label{v}
+    \begin{bmatrix}
+        v_1\\
+        v_2\\
+        v_3
+    \end{bmatrix}
+    = \begin{bmatrix}
+        1\\
+        -1\\
+        0
+    \end{bmatrix} \frac{m}{s}
+\end{equation}
+\begin{equation}
+    \label{angles_1}
+    \begin{bmatrix}
+        \varphi_1\\
+        \varphi_2\\
+        \varphi_3
+    \end{bmatrix}
+    = \begin{bmatrix}
+        \frac{1}{6}\pi\\
+        \frac{5}{6}\pi\\
+        \frac{3}{2}\pi
+    \end{bmatrix}
+\end{equation}
+With equation \ref{inv_kin} and the values \ref{v} and \ref{angles_1} we can now calculate
+\begin{equation}
+    \begin{bmatrix}
+        v_x\\
+        v_y\\
+        r \omega
+    \end{bmatrix}
+    = \begin{bmatrix}
+        0\\
+        1.15\\
+        0
+    \end{bmatrix}
+\end{equation}
+hence $ v_y = v_{max} = 1.15 \frac{m}{s}$.
+
+By arranging the front wheels in an angle of 90 degrees we use
+\begin{equation}
+    \label{angles_2}
+    \begin{bmatrix}
+        \varphi_1\\
+        \varphi_2\\
+        \varphi_3
+    \end{bmatrix}
+    = \begin{bmatrix}
+        \frac{1}{4}\pi\\
+        \frac{3}{4}\pi\\
+        \frac{3}{2}\pi
+    \end{bmatrix}
+\end{equation}
+and again with equation \ref{inv_kin} and the values \ref{v} and \ref{angles_2} we can calculate
+\begin{equation}
+    \begin{bmatrix}
+        v_x\\
+        v_y\\
+        r \omega
+    \end{bmatrix}
+    = \begin{bmatrix}
+        0\\
+        1.41\\
+        0
+    \end{bmatrix}
+\end{equation}
+hence $ v_y = v_{max} = 1.41 \frac{m}{s}$.
+
+We can see, that with an angle of 90 degrees, the robot is moving faster in
+direction y. By arranging the front wheels even closer we can in theory
+increase the speed of the robot to infinity. This is represented on figure
+\ref{fig:speed}. In reality, this of course is not possible because infinite
+torque is pretty hard to come by.
+\begin{figure}[h]
+    \includegraphics[width=1\columnwidth]{graph_02}
+    \caption{Forward speed of the robot in function of the angle between the
+        front wheels}\label{fig:speed}
+\end{figure}
+\end{document}

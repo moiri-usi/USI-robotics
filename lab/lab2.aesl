@@ -1,0 +1,57 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event size="3" name="acc_log"/>
+<event size="1" name="forward_log"/>
+<event size="1" name="turn_log"/>
+
+
+<!--list of constants-->
+<constant value="1000" name="RANGE"/>
+<constant value="300" name="FACT"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">var new_acc[3]
+var my_acc[3]
+var fact_mul1[3]
+var fact_mul2[3]
+var fact_div[3]
+var delta_acc[3] = [-2, 0, 0]
+var turn_speed = 0
+var forward_speed = 0
+
+call math.fill(new_acc, 0)
+call math.fill(my_acc, 0)
+call math.fill(fact_mul1, RANGE-FACT)
+call math.fill(fact_mul2, FACT)
+call math.fill(fact_div, RANGE)
+
+onevent acc
+	# make acc smoth
+	call math.mul(my_acc, my_acc, fact_mul1)
+	call math.mul(new_acc, acc + delta_acc, fact_mul2)
+	my_acc += new_acc
+	call math.div(my_acc, my_acc, fact_div)
+	# change leds according to the psoition
+	call leds.top(abs(my_acc[0]), abs(my_acc[1]), abs(my_acc[2]))
+	# calculate wheel speed
+	call math.atan2(turn_speed, my_acc[0], my_acc[1])
+	turn_speed >>= 6
+	forward_speed = (my_acc[1] &lt;&lt; 5)
+	# set wheel speed
+	motor.left.target=forward_speed+turn_speed
+	motor.right.target=forward_speed-turn_speed
+	emit acc_log my_acc
+	emit forward_log forward_speed
+	emit turn_log turn_speed
+</node>
+
+
+</network>

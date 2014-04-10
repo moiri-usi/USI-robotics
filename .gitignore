@@ -1,0 +1,8 @@
+lec
+*.tar.gz
+*.zip
+*.swp
+*.pdf
+*.aux
+*.log
+

@@ -1,0 +1,92 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event size="7" name="prox_log"/>
+
+
+<!--list of constants-->
+<constant value="3000" name="TARGET_FORWARD_SENSE"/>
+<constant value="400" name="MAX_SPEED"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">var min_left
+var max_left
+var mean_left
+var min_right
+var max_right
+var mean_right
+var left_sense[2]
+var forward_sense = 3000
+var forward_sense_old
+var speed[2] = [0, 0]
+var speed_d = 0
+var right_sense[2]
+onevent prox
+	left_sense = prox.horizontal[0:1]
+	forward_sense = prox.horizontal[2]
+	right_sense = [prox.horizontal[4], prox.horizontal[3]]
+	call math.stat(left_sense, min_left, max_left, mean_left)
+	call math.stat(right_sense, min_right, max_right, mean_right)
+	# calculate forward speed
+	if forward_sense == 0 and mean_left == 0 and mean_right == 0 then
+		speed[0] = 0
+		speed[1] = 0
+	else
+		speed_d = (TARGET_FORWARD_SENSE - forward_sense)/10
+		if speed_d != 0 then	
+			speed[0] +=	speed_d
+			speed[1] += speed_d
+			if speed[0] > MAX_SPEED then
+				speed[0] = MAX_SPEED
+			else
+				if speed[0] &lt; 0 then
+					speed[0] = 0
+				end
+			end
+			if speed[1] > MAX_SPEED then
+				speed[1] = MAX_SPEED
+			else
+				if speed[1] &lt; 0 then
+					speed[1] = 0
+				end
+			end
+		end
+		
+	end
+	motor.left.target = speed[0]
+	motor.right.target = speed[1]
+	# calculate turn speed
+	if  mean_left > mean_right then
+		if max_left > forward_sense then
+			#turn left
+			if (left_sense[1] > 0) then
+				speed_d = left_sense[1]/30 + left_sense[0]/15
+			else
+				speed_d = left_sense[0]/10
+			end
+			motor.left.target = speed[0] - speed_d 
+			motor.right.target = speed[1]
+		end
+	else
+		if max_right > forward_sense then
+			#turn left
+			if (left_sense[1] > 0) then
+				speed_d = right_sense[1]/30 + right_sense[0]/15
+			else
+				speed_d = right_sense[0]/10
+			end
+			motor.left.target = speed[0]
+			motor.right.target = speed[1] - speed_d
+		end
+	end
+	emit prox_log prox.horizontal</node>
+
+
+</network>
