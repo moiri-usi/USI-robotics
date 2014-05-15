@@ -36,7 +36,7 @@ int main( int argc, const char** argv )
         if(image.empty()) cout << "Couldn't read lena.jpg" << endl;
     }
 
-    // open window to didnsplay results
+    // open window to display results
     cvNamedWindow( "result", 1 );
 
     // start capture
@@ -77,7 +77,7 @@ _cleanup_:
         else if( !inputName.empty() )
         {
             /* assume it is a text file containing the
-            list of the image filenames to be processed - one per line */
+               list of the image filenames to be processed - one per line */
             FILE* f = fopen( inputName.c_str(), "rt" );
             if( f )
             {
@@ -116,24 +116,48 @@ void detectAndDraw( Mat& img )
 {
     Mat myImg;
     vector<Vec3f> circles;
+    int whiteCnt = 0;
+    int whiteCntOldX = 0;
+    int whiteCntOldY = 0;
+    int xCoord = 0;
+    int yCoord = 0;
+
+    /* convert RGB image to HSV image */
     cvtColor(img, myImg, CV_BGR2HSV);
-    //cvtColor(img, myImg, COLOR_BGR2GRAY);
+
+    /* red color detection */
     //inRange(myImg, Scalar(0, 100, 0), Scalar(3, 255, 150), myImg2);
     //inRange(myImg, Scalar(175, 100, 0), Scalar(180, 255, 150), myImg);
     //bitwise_or(myImg, myImg2, myImg);
-    inRange(myImg, Scalar(100, 50, 10), Scalar(130, 245, 200), myImg);
-    GaussianBlur(myImg, myImg, Size(9, 9), 2, 2 );
-    myImg = Scalar(255) - myImg;
-    HoughCircles(myImg, circles, CV_HOUGH_GRADIENT, 2, 100, 200, 80);
-    for( size_t i = 0; i < circles.size(); i++ )
-    {
-        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-        int radius = cvRound(circles[i][2]);
-        // draw the circle center
-        circle(img, center, 3, Scalar(0,255,0), -1, 8, 0 );
-        // draw the circle outline
-        circle(img, center, radius, Scalar(0,0,255), 3, 8, 0 );
-    }
     
+    /* green color detection */
+    inRange(myImg, Scalar(20, 100, 0), Scalar(60, 255, 150), myImg);
+
+    /* remove artefacts */
+    GaussianBlur(myImg, myImg, Size(9, 9), 2, 2);
+    threshold(myImg, myImg, 200, 255, THRESH_BINARY);
+
+    /* calculate radius and center of the circle */
+    for (size_t i = 0; i < myImg.size().height; i++) {
+        whiteCnt = countNonZero(myImg.row(i));
+        if (whiteCntOldY < whiteCnt) {
+            whiteCntOldY = whiteCnt;
+            yCoord = i;
+        }
+        whiteCnt = countNonZero(myImg.col(i));
+        if (whiteCntOldX < whiteCnt) {
+            whiteCntOldX = whiteCnt;
+            xCoord = i;
+        }
+    }
+    Point center(xCoord+1, yCoord+1);
+    int radius = cvRound((whiteCntOldX + whiteCntOldY)/4)+1;
+
+    /* draw the circle center */
+    circle(myImg, center, 3, Scalar(0,255,0), -1, 8, 0 );
+    /* draw the circle outline */
+    circle(img, center, radius, Scalar(0,0,255), 3, 8, 0 );
+
+    /* display the original image with circle */
     cv::imshow( "result", img );
 }
