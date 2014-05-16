@@ -131,7 +131,7 @@ void detectAndDraw( Mat& img )
     //bitwise_or(myImg, myImg2, myImg);
     
     /* green color detection */
-    inRange(myImg, Scalar(20, 100, 0), Scalar(60, 255, 150), myImg);
+    inRange(myImg, Scalar(30, 100, 0), Scalar(60, 255, 150), myImg);
 
     /* remove artefacts */
     GaussianBlur(myImg, myImg, Size(9, 9), 2, 2);
@@ -151,6 +151,7 @@ void detectAndDraw( Mat& img )
         }
     }
     Point center(xCoord+1, yCoord+1);
+    cout << center.x << ", " << center.y << endl;
     int radius = cvRound((whiteCntOldX + whiteCntOldY)/4)+1;
 
     /* draw the circle center */
