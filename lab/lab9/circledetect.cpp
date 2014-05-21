@@ -6,10 +6,14 @@
 #define PAPER_WIDTH 250
 #define PAPER_HEIGHT 170
 
+#define KEY_ESCAPE 27
+#define KEY_SPACE 32
+
 using namespace std;
 using namespace cv;
 
-void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs, Mat& tfPerspective, void* captPoints );
+void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs,
+        Mat& tfPerspective, void* captPoints );
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
 int main( int argc, const char** argv )
@@ -44,6 +48,7 @@ int main( int argc, const char** argv )
     {
         cout << "In capture ..." << endl;
         bool coordDone = false;
+        Mat imgCorrect;
         for(;;)
         {
             IplImage* iplImg = cvQueryFrame( capture );
@@ -55,16 +60,23 @@ int main( int argc, const char** argv )
             else
                 flip( frame, frameCopy, 0 );
 
+            /* undistort image, using xml file from demo */
+            undistort(frameCopy, imgCorrect, cameraMatrix, distCoeffs);
             if ( (captPoints.size() == 4) && !coordDone) {
-                //undistortPoints(captPoints, captPoints, cameraMatrix, distCoeffs);
                 tfPerspective = getPerspectiveTransform(captPoints, worldCoord);
                 coordDone = true;
             }
 
             // use the captured frame and do the magic
-            detectAndDraw( frameCopy, cameraMatrix, distCoeffs, tfPerspective, &captPoints );
+            detectAndDraw( imgCorrect, cameraMatrix, distCoeffs, tfPerspective,
+                    &captPoints );
 
-            if( waitKey( 10 ) >= 0 )
+            if( waitKey( 10 ) == KEY_SPACE ) {
+                captPoints.clear();
+                coordDone = false;
+            }
+
+            if( waitKey( 10 ) == KEY_ESCAPE )
                 goto _cleanup_;
         }
 
@@ -88,7 +100,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
-void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs, Mat& tfPerspective, void* captPoints )
+void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs,
+        Mat& tfPerspective, void* captPoints )
 {
     Mat imgBlob, imgSrc, imgCorner;
     int whiteCnt = 0;
@@ -99,8 +112,19 @@ void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs, Mat& tfPerspec
     vector<Point2f> center, newCenter;
     vector<Point2f>*cp = (vector<Point2f>*)captPoints;
 
-    /* undistort image, using xml file from demo */
-    undistort(img, imgSrc, cameraMatrix, distCoeffs);
+    img.copyTo( imgSrc );
+
+    /* print instructions on image */
+    putText(imgSrc, "<ESC> quit", Point(10, 20), CV_FONT_HERSHEY_PLAIN, 1,
+            Scalar::all(255), 1, 8);
+    if (cp->size() < 4) {
+        putText(imgSrc, "Mark the playground with left-mouse-clicks (ccw)",
+                Point(10, 40), CV_FONT_HERSHEY_PLAIN, 1, Scalar::all(255), 1, 8);
+    }
+    else {
+        putText(imgSrc, "<SPACE> clear playground coordinates", Point(10, 40),
+                CV_FONT_HERSHEY_PLAIN, 1, Scalar::all(255), 1, 8);
+    }
 
     /* draw clicked points */
     for (size_t i = 0; i < cp->size(); i++) {
@@ -114,8 +138,8 @@ void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs, Mat& tfPerspec
     //inRange(imgBlob, Scalar(0, 100, 0), Scalar(3, 255, 150), imgBlob2);
     //inRange(imgBlob, Scalar(175, 100, 0), Scalar(180, 255, 150), imgBlob);
     //bitwise_or(imgBlob, imgBlob2, imgBlob);
-    /* green color detection */
 
+    /* green color detection */
     inRange(imgBlob, Scalar(30, 50, 0), Scalar(60, 255, 150), imgBlob);
 
     /* remove artefacts */
@@ -137,15 +161,15 @@ void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs, Mat& tfPerspec
             xCnt++;
         }
     }
-    center.push_back(Point2f(xCoord/xCnt+1, yCoord/yCnt+1));
-    cout << "direct: " << center << endl;
-    /* calculate real position */
-    if (tfPerspective.rows > 0) {
-        perspectiveTransform(center, newCenter, tfPerspective);
-        cout << "perspective: " << newCenter << endl; // */
-    }
-
     int radius = cvRound((xCnt + yCnt)/4)+3;
+    center.push_back(Point2f(xCoord/xCnt+1, yCoord/yCnt+1));
+    cout << "IMAGE coord: " << center << endl;
+
+    /* calculate playground position */
+    if (cp->size() == 4) {
+        perspectiveTransform(center, newCenter, tfPerspective);
+        cout << "WORLD coord: " << newCenter << endl; // */
+    }
 
     /* draw the circle center */
     circle(imgSrc, center[0], 3, Scalar(0,255,0), -1, 8, 0 );
