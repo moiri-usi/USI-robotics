@@ -27,8 +27,32 @@ int main( int argc, const char** argv )
     worldCoord.push_back(Point2f(PAPER_WIDTH, 0));
     worldCoord.push_back(Point2f(PAPER_WIDTH, PAPER_HEIGHT));
     worldCoord.push_back(Point2f(0, PAPER_HEIGHT));
+    int camId = 0;
+    string camIdStr;
 
-    string filename = (argc > 1) ? argv[1] : "out_camera_data.xml";
+    const string camIdOpt = "--cam-id=";
+    size_t camIdOptLen = camIdOpt.length();
+
+    //string filename = (argc > 1) ? argv[1] : "out_camera_data.xml";
+    string filename;
+
+    for( int i = 1; i < argc; i++ )
+    {
+        cout << "Processing " << i << " " <<  argv[i] << endl;
+        if( camIdOpt.compare( 0, camIdOptLen, argv[i], camIdOptLen ) == 0 )
+        {
+            camIdStr.assign( argv[i] + camIdOptLen );
+            camId = atoi( camIdStr.c_str() );
+        }
+        else if( argv[i][0] == '-' )
+        {
+            cerr << "WARNING: Unknown option %s" << argv[i] << endl;
+        }
+        else
+            filename.assign( argv[i] );
+    }
+    if (filename.empty())
+        filename = "out_camera_data.xml";
 
     FileStorage fs;
     fs.open(filename, FileStorage::READ);
@@ -37,7 +61,7 @@ int main( int argc, const char** argv )
     fs["Distortion_Coefficients"] >> distCoeffs;
 
     // capture from cam 0
-    capture = cvCaptureFromCAM( 0 );
+    capture = cvCaptureFromCAM( camId );
 
     // open window to display results
     cvNamedWindow( "result", 1 );
@@ -140,7 +164,7 @@ void detectAndDraw( Mat& img, Mat& cameraMatrix, Mat& distCoeffs,
     //bitwise_or(imgBlob, imgBlob2, imgBlob);
 
     /* green color detection */
-    inRange(imgBlob, Scalar(30, 50, 0), Scalar(60, 255, 150), imgBlob);
+    inRange(imgBlob, Scalar(30, 100, 0), Scalar(60, 255, 150), imgBlob);
 
     /* remove artefacts */
     GaussianBlur(imgBlob, imgBlob, Size(9, 9), 2, 2);
